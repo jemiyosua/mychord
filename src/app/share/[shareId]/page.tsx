@@ -165,74 +165,76 @@ export default function SharePage({ params }: { params: Promise<{ shareId: strin
           <div className="flex flex-col md:flex-row gap-4">
             {/* Song List - Sidebar */}
             <div className="md:w-64 shrink-0">
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700">
-                    Daftar Lagu ({songs.length})
-                  </h3>
+              <div className="md:sticky md:top-4">
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700">
+                      Daftar Lagu ({songs.length})
+                    </h3>
+                  </div>
+                  <div className="divide-y divide-gray-100 max-h-[50vh] overflow-y-auto">
+                    {songs.map((song, idx) => (
+                      <button
+                        key={song.id}
+                        onClick={() => setActiveIndex(idx)}
+                        className={`w-full text-left px-4 py-3 transition-colors ${
+                          idx === activeIndex
+                            ? "bg-blue-50 border-l-4 border-blue-600"
+                            : "hover:bg-gray-50 border-l-4 border-transparent"
+                        }`}
+                      >
+                        <p className={`text-sm font-medium truncate ${
+                          idx === activeIndex ? "text-blue-700" : "text-gray-900"
+                        }`}>
+                          {song.title}
+                        </p>
+                        {song.artist && (
+                          <p className="text-xs text-gray-500 truncate mt-0.5">{song.artist}</p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
-                  {songs.map((song, idx) => (
+
+                {/* Instrument Selector */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-4">
+                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700">Instrumen</h3>
+                  </div>
+                  <div className="p-3 space-y-2">
                     <button
-                      key={song.id}
-                      onClick={() => setActiveIndex(idx)}
-                      className={`w-full text-left px-4 py-3 transition-colors ${
-                        idx === activeIndex
-                          ? "bg-blue-50 border-l-4 border-blue-600"
-                          : "hover:bg-gray-50 border-l-4 border-transparent"
+                      onClick={() => setInstrument("piano")}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                        instrument === "piano"
+                          ? "bg-blue-50 border border-blue-200 text-blue-700"
+                          : "hover:bg-gray-50 border border-transparent text-gray-700"
                       }`}
                     >
-                      <p className={`text-sm font-medium truncate ${
-                        idx === activeIndex ? "text-blue-700" : "text-gray-900"
-                      }`}>
-                        {song.title}
-                      </p>
-                      {song.artist && (
-                        <p className="text-xs text-gray-500 truncate mt-0.5">{song.artist}</p>
-                      )}
+                      <span className="text-lg">🎹</span>
+                      <div>
+                        <p className={`text-sm font-medium ${instrument === "piano" ? "text-blue-700" : "text-gray-900"}`}>
+                          Piano / Keyboard
+                        </p>
+                        <p className="text-xs text-gray-500">Concert pitch (nada normal)</p>
+                      </div>
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Instrument Selector */}
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-4">
-                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700">Instrumen</h3>
-                </div>
-                <div className="p-3 space-y-2">
-                  <button
-                    onClick={() => setInstrument("piano")}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                      instrument === "piano"
-                        ? "bg-blue-50 border border-blue-200 text-blue-700"
-                        : "hover:bg-gray-50 border border-transparent text-gray-700"
-                    }`}
-                  >
-                    <span className="text-lg">🎹</span>
-                    <div>
-                      <p className={`text-sm font-medium ${instrument === "piano" ? "text-blue-700" : "text-gray-900"}`}>
-                        Piano / Keyboard
-                      </p>
-                      <p className="text-xs text-gray-500">Concert pitch (nada normal)</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setInstrument("alto-sax")}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                      instrument === "alto-sax"
-                        ? "bg-blue-50 border border-blue-200 text-blue-700"
-                        : "hover:bg-gray-50 border border-transparent text-gray-700"
-                    }`}
-                  >
-                    <span className="text-lg">🎷</span>
-                    <div>
-                      <p className={`text-sm font-medium ${instrument === "alto-sax" ? "text-blue-700" : "text-gray-900"}`}>
-                        Alto Saxophone
-                      </p>
-                      <p className="text-xs text-gray-500">Transposisi Eb</p>
-                    </div>
-                  </button>
+                    <button
+                      onClick={() => setInstrument("alto-sax")}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                        instrument === "alto-sax"
+                          ? "bg-blue-50 border border-blue-200 text-blue-700"
+                          : "hover:bg-gray-50 border border-transparent text-gray-700"
+                      }`}
+                    >
+                      <span className="text-lg">🎷</span>
+                      <div>
+                        <p className={`text-sm font-medium ${instrument === "alto-sax" ? "text-blue-700" : "text-gray-900"}`}>
+                          Alto Saxophone
+                        </p>
+                        <p className="text-xs text-gray-500">Transposisi Eb</p>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

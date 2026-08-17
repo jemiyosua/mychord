@@ -16,36 +16,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   async function checkAuth() {
     const token = localStorage.getItem("auth_token");
+    const userId = localStorage.getItem("auth_user_id");
 
-    if (!token) {
+    if (!token || !userId) {
       router.push("/login");
       return;
     }
 
-    try {
-      const res = await fetch("/api/auth/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-
-      if (!res.ok) {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("auth_username");
-        router.push("/login");
-        return;
-      }
-
-      setAuthenticated(true);
-    } catch {
-      router.push("/login");
-    }
+    setAuthenticated(true);
     setChecking(false);
   }
 
   function handleLogout() {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_username");
+    localStorage.removeItem("auth_user_id");
     router.push("/login");
   }
 

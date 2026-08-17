@@ -2,11 +2,11 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import type { Collection, Song } from "@/lib/types";
+import type { Song } from "@/lib/types";
+import { goGetSongs, goSaveSong, type SongResult } from "@/lib/go-api";
 
 export default function CollectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [collection, setCollection] = useState<Collection | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -16,12 +16,12 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   const [formContent, setFormContent] = useState("");
   const [formKey, setFormKey] = useState("C");
 
-  function getAuthHeaders(): Record<string, string> {
-    return {
-      "Content-Type": "application/json",
-      "X-Auth-Token": localStorage.getItem("auth_token") || "",
-      "X-User-Id": localStorage.getItem("auth_user_id") || "0",
-    };
+  function getToken() {
+    return localStorage.getItem("auth_token") || "";
+  }
+
+  function getUserId() {
+    return parseInt(localStorage.getItem("auth_user_id") || "0", 10);
   }
 
   useEffect(() => {
@@ -29,44 +29,64 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   }, [id]);
 
   async function fetchData() {
-    const headers = getAuthHeaders();
-    const [colRes, songsRes] = await Promise.all([
-      fetch(`/api/collections/${id}`, { headers }),
-      fetch(`/api/collections/${id}/songs`, { headers }),
-    ]);
-    const colData = await colRes.json();
-    const songsData = await songsRes.json();
-    setCollection(colData);
-    setSongs(songsData);
+    try {
+      const result = await goGetSongs({
+        token: getToken(),
+        user_id: getUserId(),
+        page: 1,
+        row_page: 100,
+      });
+
+      if (result.error_code === "0" && Array.isArray(result.result)) {
+        const mapped: Song[] = (result.result as SongResult[]).map((song, idx) => ({
+          id: String(song.id),
+          collectionId: id,
+          title: song.title,
+          artist: song.artist,
+          content: song.chord_content,
+          originalKey: song.original_key,
+          order: idx + 1,
+          createdAt: song.tgl_input,
+          updatedAt: song.tgl_update,
+        }));
+        setSongs(mapped);
+      } else {
+        setSongs([]);
+      }
+    } catch {
+      setSongs([]);
+    }
     setLoading(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const headers = getAuthHeaders();
 
-    if (editingSong) {
-      await fetch(`/api/songs/${editingSong.id}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({
+    try {
+      if (editingSong) {
+        await goSaveSong({
+          method: "UPDATE",
+          token: getToken(),
+          user_id: getUserId(),
+          song_id: parseInt(editingSong.id, 10),
           title: formTitle,
           artist: formArtist,
-          content: formContent,
-          originalKey: formKey,
-        }),
-      });
-    } else {
-      await fetch(`/api/collections/${id}/songs`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
+          chord_content: formContent,
+          original_key: formKey,
+        });
+      } else {
+        await goSaveSong({
+          method: "INSERT",
+          token: getToken(),
+          user_id: getUserId(),
           title: formTitle,
           artist: formArtist,
-          content: formContent,
-          originalKey: formKey,
-        }),
-      });
+          chord_content: formContent,
+          original_key: formKey,
+        });
+      }
+    } catch {
+      // ignore
     }
 
     resetForm();
@@ -75,7 +95,19 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   async function handleDelete(songId: string) {
     if (!confirm("Apakah kamu yakin ingin menghapus lagu ini?")) return;
-    await fetch(`/api/songs/${songId}`, { method: "DELETE", headers: getAuthHeaders() });
+
+    try {
+      await goSaveSong({
+        method: "DELETE",
+        token: getToken(),
+        user_id: getUserId(),
+        song_id: parseInt(songId, 10),
+        title: "deleted",
+        chord_content: "deleted",
+      });
+    } catch {
+      // ignore
+    }
     fetchData();
   }
 
@@ -97,57 +129,24 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     setFormKey("C");
   }
 
-  async function handleMoveUp(idx: number) {
+  function handleMoveUp(idx: number) {
     if (idx === 0) return;
     const newSongs = [...songs];
     [newSongs[idx - 1], newSongs[idx]] = [newSongs[idx], newSongs[idx - 1]];
     setSongs(newSongs);
-    const songIds = newSongs.map(s => s.id);
-    await fetch(`/api/collections/${id}/reorder`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ songIds }),
-    });
   }
 
-  async function handleMoveDown(idx: number) {
+  function handleMoveDown(idx: number) {
     if (idx === songs.length - 1) return;
     const newSongs = [...songs];
     [newSongs[idx], newSongs[idx + 1]] = [newSongs[idx + 1], newSongs[idx]];
     setSongs(newSongs);
-    const songIds = newSongs.map(s => s.id);
-    await fetch(`/api/collections/${id}/reorder`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ songIds }),
-    });
-  }
-
-  function getShareUrl() {
-    if (!collection || typeof window === "undefined") return "";
-    return `${window.location.origin}/share/${collection.shareId}`;
-  }
-
-  function copyShareLink() {
-    navigator.clipboard.writeText(getShareUrl());
-    alert("Link berhasil disalin!");
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!collection) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-gray-500 text-lg">Collection tidak ditemukan</p>
-        <Link href="/admin" className="text-blue-600 hover:underline mt-2 inline-block">
-          Kembali ke Collections
-        </Link>
       </div>
     );
   }
@@ -164,53 +163,24 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        <span className="text-gray-900 font-medium">{collection.name}</span>
+        <span className="text-gray-900 font-medium">My Songs</span>
       </nav>
 
       {/* Page Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{collection.name}</h1>
-          {collection.description && (
-            <p className="text-gray-600 mt-1">{collection.description}</p>
-          )}
+          <h1 className="text-2xl font-bold text-gray-900">My Songs</h1>
+          <p className="text-gray-600 mt-1">Kelola lagu dan chord kamu</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={copyShareLink}
-            className="inline-flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            Share Link
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Tambah Lagu
-          </button>
-        </div>
-      </div>
-
-      {/* Share URL Display */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-blue-700 font-medium">Share URL:</span>
-          <code className="bg-white px-2 py-1 rounded border border-blue-200 text-blue-800 text-xs flex-1 truncate">
-            {getShareUrl()}
-          </code>
-          <button
-            onClick={copyShareLink}
-            className="text-blue-600 hover:text-blue-800 font-medium text-sm whitespace-nowrap"
-          >
-            Salin
-          </button>
-        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Tambah Lagu
+        </button>
       </div>
 
       {/* Song Form */}
@@ -304,7 +274,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
           </svg>
           <p className="text-gray-500 text-lg">Belum ada lagu</p>
-          <p className="text-gray-400 mt-1">Tambah lagu pertamamu di collection ini</p>
+          <p className="text-gray-400 mt-1">Tambah lagu pertamamu</p>
         </div>
       ) : (
         <div className="space-y-3">

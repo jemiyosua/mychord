@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { goLogin } from "@/lib/go-api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,24 +17,18 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+      const result = await goLogin(username, password);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Login gagal");
+      if (result.error_code !== "0") {
+        setError(result.error_message || "Login gagal");
         setLoading(false);
         return;
       }
 
       // Save token and user info to localStorage
-      localStorage.setItem("auth_token", data.token);
-      localStorage.setItem("auth_username", data.username);
-      if (data.user_id) localStorage.setItem("auth_user_id", String(data.user_id));
+      localStorage.setItem("auth_token", result.result.token);
+      localStorage.setItem("auth_username", result.result.username);
+      localStorage.setItem("auth_user_id", String(result.result.id));
 
       // Redirect to admin
       router.push("/admin");

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<'/api/songs/[id]'>
     }
 
     // Map Go API response to frontend Song format
-    const song = result.result as { id: number; user_id: number; title: string; artist: string; chord_content: string; original_key: string; genre: string; tgl_input: string; tgl_update: string };
+    const song = result.result as { id: number; user_id: number; title: string; artist: string; chord_content: string; original_key: string; genre: string; reference_link: string; tgl_input: string; tgl_update: string };
     return Response.json({
       id: String(song.id),
       collectionId: '',
@@ -30,6 +30,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<'/api/songs/[id]'>
       artist: song.artist,
       content: song.chord_content,
       originalKey: song.original_key,
+      referenceLink: song.reference_link || '',
       order: 0,
       createdAt: song.tgl_input,
       updatedAt: song.tgl_update,

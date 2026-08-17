@@ -56,6 +56,7 @@ export default function SongEditorPage({ params }: { params: Promise<{ id: strin
           artist: s.artist,
           content: s.chord_content,
           originalKey: s.original_key,
+          referenceLink: s.reference_link || "",
           order: 0,
           createdAt: s.tgl_input,
           updatedAt: s.tgl_update,

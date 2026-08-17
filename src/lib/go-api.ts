@@ -84,6 +84,7 @@ export interface SongResult {
   chord_content: string;
   original_key: string;
   genre: string;
+  reference_link: string;
   song_order: number;
   tgl_input: string;
   tgl_update: string;

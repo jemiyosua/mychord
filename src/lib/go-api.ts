@@ -1,5 +1,5 @@
-// Go API base URL
-const GO_API_BASE = process.env.GO_API_URL || "http://localhost:8080/api/v1/web";
+// Go API base URL - called directly from browser
+const GO_API_BASE = "https://api.ipl-q.com/api/v1/web";
 
 interface GoApiResponse<T = unknown> {
   error_code: string;
@@ -11,7 +11,7 @@ interface GoApiResponse<T = unknown> {
 }
 
 /**
- * Make a POST request to Go API
+ * Make a POST request directly to Go API from client
  */
 export async function goApiFetch<T = unknown>(
   endpoint: string,

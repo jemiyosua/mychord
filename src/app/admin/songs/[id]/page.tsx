@@ -3,15 +3,15 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Song, Collection } from "@/lib/types";
+import type { Song } from "@/lib/types";
 import { transposeSong, isChordLine, isChord } from "@/lib/chords";
+import { goGetSongs, goSaveSong, type SongResult } from "@/lib/go-api";
 
 export default function SongEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
 
   const [song, setSong] = useState<Song | null>(null);
-  const [collection, setCollection] = useState<Collection | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -27,12 +27,12 @@ export default function SongEditorPage({ params }: { params: Promise<{ id: strin
 
   const KEYS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-  function getAuthHeaders(): Record<string, string> {
-    return {
-      "Content-Type": "application/json",
-      "X-Auth-Token": typeof window !== "undefined" ? (localStorage.getItem("auth_token") || "") : "",
-      "X-User-Id": typeof window !== "undefined" ? (localStorage.getItem("auth_user_id") || "0") : "0",
-    };
+  function getToken() {
+    return typeof window !== "undefined" ? (localStorage.getItem("auth_token") || "") : "";
+  }
+
+  function getUserId() {
+    return typeof window !== "undefined" ? parseInt(localStorage.getItem("auth_user_id") || "0", 10) : 0;
   }
 
   useEffect(() => {
@@ -41,24 +41,30 @@ export default function SongEditorPage({ params }: { params: Promise<{ id: strin
 
   async function fetchSong() {
     try {
-      const headers = getAuthHeaders();
-      const res = await fetch(`/api/songs/${id}`, { headers });
-      if (!res.ok) {
-        setLoading(false);
-        return;
-      }
-      const songData: Song = await res.json();
-      setSong(songData);
-      setTitle(songData.title);
-      setArtist(songData.artist);
-      setContent(songData.content);
-      setOriginalKey(songData.originalKey);
+      const result = await goGetSongs({
+        token: getToken(),
+        user_id: getUserId(),
+        song_id: parseInt(id, 10),
+      });
 
-      // Fetch collection info
-      const colRes = await fetch(`/api/collections/${songData.collectionId}`, { headers });
-      if (colRes.ok) {
-        const colData = await colRes.json();
-        setCollection(colData);
+      if (result.error_code === "0" && result.result) {
+        const s = result.result as SongResult;
+        const songData: Song = {
+          id: String(s.id),
+          collectionId: "",
+          title: s.title,
+          artist: s.artist,
+          content: s.chord_content,
+          originalKey: s.original_key,
+          order: 0,
+          createdAt: s.tgl_input,
+          updatedAt: s.tgl_update,
+        };
+        setSong(songData);
+        setTitle(songData.title);
+        setArtist(songData.artist);
+        setContent(songData.content);
+        setOriginalKey(songData.originalKey);
       }
     } catch {
       // ignore
@@ -71,20 +77,29 @@ export default function SongEditorPage({ params }: { params: Promise<{ id: strin
     setSaving(true);
     setSaveMessage("");
 
-    const res = await fetch(`/api/songs/${id}`, {
-      method: "PUT",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ title, artist, content, originalKey }),
-    });
+    try {
+      const result = await goSaveSong({
+        method: "UPDATE",
+        token: getToken(),
+        user_id: getUserId(),
+        song_id: parseInt(id, 10),
+        title,
+        artist,
+        chord_content: content,
+        original_key: originalKey,
+      });
 
-    setSaving(false);
-    if (res.ok) {
-      setSaveMessage("Berhasil disimpan!");
-      fetchSong();
-      setTimeout(() => setSaveMessage(""), 3000);
-    } else {
+      if (result.error_code === "0") {
+        setSaveMessage("Berhasil disimpan!");
+        fetchSong();
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage(result.error_message || "Gagal menyimpan. Coba lagi.");
+      }
+    } catch {
       setSaveMessage("Gagal menyimpan. Coba lagi.");
     }
+    setSaving(false);
   }
 
   // Transpose naik 1 semitone - mengubah chord di content langsung
@@ -206,19 +221,6 @@ export default function SongEditorPage({ params }: { params: Promise<{ id: strin
         <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        {collection && (
-          <>
-            <Link
-              href={`/admin/collections/${collection.id}`}
-              className="hover:text-blue-600 transition-colors"
-            >
-              {collection.name}
-            </Link>
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </>
-        )}
         <span className="text-gray-900 font-medium">{title || "Edit Lagu"}</span>
       </nav>
 

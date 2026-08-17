@@ -15,6 +15,17 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MyChord - Chord Library",
   description: "Manage and share your chord collections",
+  openGraph: {
+    title: "MyChord - Chord Library",
+    description: "Manage and share your chord collections",
+    siteName: "MyChord",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "MyChord - Chord Library",
+    description: "Manage and share your chord collections",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

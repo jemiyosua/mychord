@@ -1,18 +1,56 @@
-import { getSongsByCollection, createSong, getCollectionById } from '@/lib/db';
+import { goGetSongs, goSaveSong, type SongResult } from '@/lib/go-api';
 import type { NextRequest } from 'next/server';
 
-export async function GET(_req: NextRequest, ctx: RouteContext<'/api/collections/[id]/songs'>) {
-  const { id } = await ctx.params;
-  const songs = await getSongsByCollection(id);
-  return Response.json(songs);
+export async function GET(req: NextRequest, ctx: RouteContext<'/api/collections/[id]/songs'>) {
+  // Collection ID is not used in Go API (songs are per user, not per collection)
+  // We fetch all songs for the user
+  const token = req.headers.get('X-Auth-Token') || '';
+  const userId = parseInt(req.headers.get('X-User-Id') || '0', 10);
+
+  // Allow unauthenticated access for backwards compat (will return empty)
+  if (!token || !userId) {
+    return Response.json([]);
+  }
+
+  try {
+    const result = await goGetSongs({
+      token,
+      user_id: userId,
+      page: 1,
+      row_page: 100,
+    });
+
+    if (result.error_code !== '0') {
+      return Response.json([]);
+    }
+
+    // Map Go API response to frontend Song[] format
+    const songs = Array.isArray(result.result) ? result.result : [];
+    const mapped = songs.map((song: SongResult, idx: number) => ({
+      id: String(song.id),
+      collectionId: (ctx as { params: Promise<{ id: string }> }).params ? '' : '',
+      title: song.title,
+      artist: song.artist,
+      content: song.chord_content,
+      originalKey: song.original_key,
+      order: idx + 1,
+      createdAt: song.tgl_input,
+      updatedAt: song.tgl_update,
+    }));
+
+    return Response.json(mapped);
+  } catch (error) {
+    console.error('Get songs error:', error);
+    return Response.json([]);
+  }
 }
 
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/collections/[id]/songs'>) {
-  const { id } = await ctx.params;
+  const token = req.headers.get('X-Auth-Token') || '';
+  const userId = parseInt(req.headers.get('X-User-Id') || '0', 10);
 
-  const collection = await getCollectionById(id);
-  if (!collection) {
-    return Response.json({ error: 'Collection not found' }, { status: 404 });
+  if (!token || !userId) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const body = await req.json();
@@ -22,6 +60,36 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/collections
     return Response.json({ error: 'Title is required' }, { status: 400 });
   }
 
-  const song = await createSong(id, title, artist || '', content || '', originalKey || 'C');
-  return Response.json(song, { status: 201 });
+  try {
+    const result = await goSaveSong({
+      method: 'INSERT',
+      token,
+      user_id: userId,
+      title,
+      artist: artist || '',
+      chord_content: content || '',
+      original_key: originalKey || 'C',
+    });
+
+    if (result.error_code !== '0') {
+      return Response.json({ error: result.error_message }, { status: 400 });
+    }
+
+    const songId = result.result?.song_id || '0';
+
+    return Response.json({
+      id: songId,
+      collectionId: '',
+      title,
+      artist: artist || '',
+      content: content || '',
+      originalKey: originalKey || 'C',
+      order: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { status: 201 });
+  } catch (error) {
+    console.error('Create song error:', error);
+    return Response.json({ error: 'Server error' }, { status: 500 });
+  }
 }

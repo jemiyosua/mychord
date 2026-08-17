@@ -30,9 +30,10 @@ export default function LoginPage() {
         return;
       }
 
-      // Save token to localStorage
+      // Save token and user info to localStorage
       localStorage.setItem("auth_token", data.token);
       localStorage.setItem("auth_username", data.username);
+      if (data.user_id) localStorage.setItem("auth_user_id", String(data.user_id));
 
       // Redirect to admin
       router.push("/admin");

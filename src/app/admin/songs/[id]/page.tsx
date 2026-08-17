@@ -27,13 +27,22 @@ export default function SongEditorPage({ params }: { params: Promise<{ id: strin
 
   const KEYS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
+  function getAuthHeaders(): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      "X-Auth-Token": typeof window !== "undefined" ? (localStorage.getItem("auth_token") || "") : "",
+      "X-User-Id": typeof window !== "undefined" ? (localStorage.getItem("auth_user_id") || "0") : "0",
+    };
+  }
+
   useEffect(() => {
     fetchSong();
   }, [id]);
 
   async function fetchSong() {
     try {
-      const res = await fetch(`/api/songs/${id}`);
+      const headers = getAuthHeaders();
+      const res = await fetch(`/api/songs/${id}`, { headers });
       if (!res.ok) {
         setLoading(false);
         return;
@@ -46,7 +55,7 @@ export default function SongEditorPage({ params }: { params: Promise<{ id: strin
       setOriginalKey(songData.originalKey);
 
       // Fetch collection info
-      const colRes = await fetch(`/api/collections/${songData.collectionId}`);
+      const colRes = await fetch(`/api/collections/${songData.collectionId}`, { headers });
       if (colRes.ok) {
         const colData = await colRes.json();
         setCollection(colData);
@@ -64,7 +73,7 @@ export default function SongEditorPage({ params }: { params: Promise<{ id: strin
 
     const res = await fetch(`/api/songs/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ title, artist, content, originalKey }),
     });
 

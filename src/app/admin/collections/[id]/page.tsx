@@ -16,14 +16,23 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   const [formContent, setFormContent] = useState("");
   const [formKey, setFormKey] = useState("C");
 
+  function getAuthHeaders(): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      "X-Auth-Token": localStorage.getItem("auth_token") || "",
+      "X-User-Id": localStorage.getItem("auth_user_id") || "0",
+    };
+  }
+
   useEffect(() => {
     fetchData();
   }, [id]);
 
   async function fetchData() {
+    const headers = getAuthHeaders();
     const [colRes, songsRes] = await Promise.all([
-      fetch(`/api/collections/${id}`),
-      fetch(`/api/collections/${id}/songs`),
+      fetch(`/api/collections/${id}`, { headers }),
+      fetch(`/api/collections/${id}/songs`, { headers }),
     ]);
     const colData = await colRes.json();
     const songsData = await songsRes.json();
@@ -34,11 +43,12 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const headers = getAuthHeaders();
 
     if (editingSong) {
       await fetch(`/api/songs/${editingSong.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           title: formTitle,
           artist: formArtist,
@@ -49,7 +59,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     } else {
       await fetch(`/api/collections/${id}/songs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           title: formTitle,
           artist: formArtist,
@@ -65,7 +75,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   async function handleDelete(songId: string) {
     if (!confirm("Apakah kamu yakin ingin menghapus lagu ini?")) return;
-    await fetch(`/api/songs/${songId}`, { method: "DELETE" });
+    await fetch(`/api/songs/${songId}`, { method: "DELETE", headers: getAuthHeaders() });
     fetchData();
   }
 

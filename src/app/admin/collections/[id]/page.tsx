@@ -109,7 +109,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     const songIds = newSongs.map(s => s.id);
     await fetch(`/api/collections/${id}/reorder`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ songIds }),
     });
   }
@@ -122,7 +122,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     const songIds = newSongs.map(s => s.id);
     await fetch(`/api/collections/${id}/reorder`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ songIds }),
     });
   }

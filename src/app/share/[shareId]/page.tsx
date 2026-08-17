@@ -2,9 +2,21 @@
 
 import { useEffect, useState, use } from "react";
 import type { Collection, Song } from "@/lib/types";
-import { isChordLine, isChord } from "@/lib/chords";
+import { isChordLine, isChord, transposeChord } from "@/lib/chords";
 
-function SongView({ song }: { song: Song }) {
+// Transpose semitones from Piano (concert pitch) to Alto Sax (Eb instrument)
+// Alto Sax sounds a major 6th lower, so written note is 9 semitones higher
+// Piano C = Alto Sax A (+9), Piano D = Alto Sax B (+9), etc.
+const ALTO_SAX_SEMITONES = 9;
+
+type Instrument = "piano" | "alto-sax";
+
+function transposeChordForInstrument(chord: string, instrument: Instrument): string {
+  if (instrument === "piano") return chord;
+  return transposeChord(chord, ALTO_SAX_SEMITONES);
+}
+
+function SongView({ song, instrument }: { song: Song; instrument: Instrument }) {
   function renderContent(content: string) {
     const lines = content.split("\n");
     return lines.map((line, lineIdx) => {
@@ -18,9 +30,10 @@ function SongView({ song }: { song: Song }) {
           <div key={lineIdx} className="min-h-[1.75rem]">
             {tokens.map((token, i) => {
               if (token.trim() && isChord(token.trim())) {
+                const displayed = transposeChordForInstrument(token.trim(), instrument);
                 return (
                   <span key={i} className="inline-block text-blue-600 font-bold bg-blue-50 px-1 rounded text-sm">
-                    {token}
+                    {displayed}
                   </span>
                 );
               }
@@ -36,9 +49,10 @@ function SongView({ song }: { song: Song }) {
           {parts.map((part, i) => {
             if (part.startsWith("[") && part.endsWith("]")) {
               const chord = part.slice(1, -1);
+              const displayed = transposeChordForInstrument(chord, instrument);
               return (
                 <span key={i} className="inline-block text-red-700 font-bold bg-red-100 px-1 rounded text-sm">
-                  {chord}
+                  {displayed}
                 </span>
               );
             }
@@ -49,6 +63,8 @@ function SongView({ song }: { song: Song }) {
     });
   }
 
+  const displayKey = transposeChordForInstrument(song.originalKey, instrument);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -57,7 +73,7 @@ function SongView({ song }: { song: Song }) {
           {song.artist && <p className="text-gray-500 text-sm mt-1">{song.artist}</p>}
         </div>
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-          Key: {song.originalKey}
+          Key: {displayKey}
         </span>
       </div>
       <div className="font-mono text-sm leading-7 whitespace-pre-wrap text-gray-800 bg-gray-50 rounded-lg p-4">
@@ -74,6 +90,7 @@ export default function SharePage({ params }: { params: Promise<{ shareId: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [instrument, setInstrument] = useState<Instrument>("piano");
 
   useEffect(() => {
     fetchData();
@@ -177,13 +194,54 @@ export default function SharePage({ params }: { params: Promise<{ shareId: strin
                   ))}
                 </div>
               </div>
+
+              {/* Instrument Selector */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-4">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700">Instrumen</h3>
+                </div>
+                <div className="p-3 space-y-2">
+                  <button
+                    onClick={() => setInstrument("piano")}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                      instrument === "piano"
+                        ? "bg-blue-50 border border-blue-200 text-blue-700"
+                        : "hover:bg-gray-50 border border-transparent text-gray-700"
+                    }`}
+                  >
+                    <span className="text-lg">🎹</span>
+                    <div>
+                      <p className={`text-sm font-medium ${instrument === "piano" ? "text-blue-700" : "text-gray-900"}`}>
+                        Piano / Keyboard
+                      </p>
+                      <p className="text-xs text-gray-500">Concert pitch (nada normal)</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setInstrument("alto-sax")}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                      instrument === "alto-sax"
+                        ? "bg-blue-50 border border-blue-200 text-blue-700"
+                        : "hover:bg-gray-50 border border-transparent text-gray-700"
+                    }`}
+                  >
+                    <span className="text-lg">🎷</span>
+                    <div>
+                      <p className={`text-sm font-medium ${instrument === "alto-sax" ? "text-blue-700" : "text-gray-900"}`}>
+                        Alto Saxophone
+                      </p>
+                      <p className="text-xs text-gray-500">Transposisi Eb</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Active Song Content */}
             <div className="flex-1">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 {activeSong ? (
-                  <SongView song={activeSong} />
+                  <SongView song={activeSong} instrument={instrument} />
                 ) : (
                   <p className="text-gray-500">Pilih lagu dari daftar</p>
                 )}

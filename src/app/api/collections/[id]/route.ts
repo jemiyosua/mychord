@@ -1,15 +1,19 @@
-import { getCollectionById, updateCollection, deleteCollection } from '@/lib/db';
-import type { NextRequest } from 'next/server';
+import type { NextRequest } from "next/server";
+
+// Collections are no longer stored in a local database.
+// Returns a default collection for UI compatibility.
 
 export async function GET(_req: NextRequest, ctx: RouteContext<'/api/collections/[id]'>) {
   const { id } = await ctx.params;
-  const collection = await getCollectionById(id);
 
-  if (!collection) {
-    return Response.json({ error: 'Collection not found' }, { status: 404 });
-  }
-
-  return Response.json(collection);
+  return Response.json({
+    id,
+    name: "My Songs",
+    description: "Koleksi lagu saya",
+    shareId: "mychord",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 export async function PUT(req: NextRequest, ctx: RouteContext<'/api/collections/[id]'>) {
@@ -17,25 +21,16 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/collections/
   const body = await req.json();
   const { name, description } = body;
 
-  if (!name) {
-    return Response.json({ error: 'Name is required' }, { status: 400 });
-  }
-
-  const collection = await updateCollection(id, name, description || '');
-  if (!collection) {
-    return Response.json({ error: 'Collection not found' }, { status: 404 });
-  }
-
-  return Response.json(collection);
+  return Response.json({
+    id,
+    name: name || "My Songs",
+    description: description || "",
+    shareId: "mychord",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
 }
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/collections/[id]'>) {
-  const { id } = await ctx.params;
-  const success = await deleteCollection(id);
-
-  if (!success) {
-    return Response.json({ error: 'Collection not found' }, { status: 404 });
-  }
-
+export async function DELETE(_req: NextRequest) {
   return Response.json({ success: true });
 }

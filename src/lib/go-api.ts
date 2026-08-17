@@ -1,5 +1,5 @@
 // Go API base URL
-const GO_API_BASE = process.env.GO_API_URL || "http://localhost:8080/api/v1/web";
+const GO_API_BASE = process.env.GO_API_URL || "https://api.ipl-q.com/api/v1/web";
 
 interface GoApiResponse<T = unknown> {
   error_code: string;

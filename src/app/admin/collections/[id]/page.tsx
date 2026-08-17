@@ -15,6 +15,10 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   const [formArtist, setFormArtist] = useState("");
   const [formContent, setFormContent] = useState("");
   const [formKey, setFormKey] = useState("C");
+  const [editingCollection, setEditingCollection] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
 
   function getAuthHeaders(): Record<string, string> {
     return {
@@ -125,12 +129,46 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   function getShareUrl() {
     if (!collection || typeof window === "undefined") return "";
+    if (!collection.shareId) return "";
     return `${window.location.origin}/share/${collection.shareId}`;
   }
 
   function copyShareLink() {
-    navigator.clipboard.writeText(getShareUrl());
-    alert("Link berhasil disalin!");
+    const url = getShareUrl();
+    if (!url) {
+      alert("Share URL belum tersedia untuk collection ini.");
+      return;
+    }
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
+
+  function startEditCollection() {
+    if (!collection) return;
+    setEditName(collection.name);
+    setEditDescription(collection.description);
+    setEditingCollection(true);
+  }
+
+  async function handleUpdateCollection(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editName.trim()) return;
+
+    const headers = getAuthHeaders();
+    const res = await fetch(`/api/collections/${id}`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ name: editName.trim(), description: editDescription.trim() }),
+    });
+
+    if (res.ok) {
+      const updated = await res.json();
+      setCollection(updated);
+      setEditingCollection(false);
+    } else {
+      alert("Gagal mengupdate collection.");
+    }
   }
 
   if (loading) {
@@ -170,9 +208,57 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
       {/* Page Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{collection.name}</h1>
-          {collection.description && (
-            <p className="text-gray-600 mt-1">{collection.description}</p>
+          {editingCollection ? (
+            <form onSubmit={handleUpdateCollection} className="space-y-3">
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="text-2xl font-bold text-gray-900 border border-gray-300 rounded-lg px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-full"
+                autoFocus
+                required
+              />
+              <input
+                type="text"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Deskripsi (opsional)"
+                className="text-sm text-gray-600 border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-full"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Simpan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingCollection(false)}
+                  className="text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="group">
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">{collection.name}</h1>
+                <button
+                  onClick={startEditCollection}
+                  className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Edit nama collection"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              </div>
+              {collection.description && (
+                <p className="text-gray-600 mt-1">{collection.description}</p>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -183,7 +269,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
-            Share Link
+            {linkCopied ? "Tersalin!" : "Share Link"}
           </button>
           <button
             onClick={() => setShowForm(true)}
@@ -198,20 +284,22 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* Share URL Display */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-blue-700 font-medium">Share URL:</span>
-          <code className="bg-white px-2 py-1 rounded border border-blue-200 text-blue-800 text-xs flex-1 truncate">
-            {getShareUrl()}
-          </code>
-          <button
-            onClick={copyShareLink}
-            className="text-blue-600 hover:text-blue-800 font-medium text-sm whitespace-nowrap"
-          >
-            Salin
-          </button>
+      {getShareUrl() && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-blue-700 font-medium">Share URL:</span>
+            <code className="bg-white px-2 py-1 rounded border border-blue-200 text-blue-800 text-xs flex-1 truncate">
+              {getShareUrl()}
+            </code>
+            <button
+              onClick={copyShareLink}
+              className="text-blue-600 hover:text-blue-800 font-medium text-sm whitespace-nowrap"
+            >
+              {linkCopied ? "✓ Tersalin" : "Salin"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Song Form */}
       {showForm && (

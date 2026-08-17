@@ -1,105 +1,113 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { neon } from '@neondatabase/serverless';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppData, Collection, Song } from './types';
+import type { Collection, Song } from './types';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
-
-async function ensureDbExists(): Promise<void> {
-  const dir = path.dirname(DB_PATH);
-  try {
-    await fs.access(dir);
-  } catch {
-    await fs.mkdir(dir, { recursive: true });
+function getDb() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL environment variable is not set');
   }
-  try {
-    await fs.access(DB_PATH);
-  } catch {
-    const initialData: AppData = { collections: [], songs: [] };
-    await fs.writeFile(DB_PATH, JSON.stringify(initialData, null, 2));
-  }
+  return neon(databaseUrl);
 }
 
-async function readDb(): Promise<AppData> {
-  await ensureDbExists();
-  const data = await fs.readFile(DB_PATH, 'utf-8');
-  return JSON.parse(data);
-}
+// ============ Schema Migration ============
 
-async function writeDb(data: AppData): Promise<void> {
-  await ensureDbExists();
-  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
+export async function initializeDatabase(): Promise<void> {
+  const sql = getDb();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS collections (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      share_id TEXT UNIQUE NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS songs (
+      id TEXT PRIMARY KEY,
+      collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      artist TEXT DEFAULT '',
+      content TEXT DEFAULT '',
+      original_key TEXT DEFAULT 'C',
+      song_order INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
 }
 
 // ============ Collections ============
 
 export async function getCollections(): Promise<Collection[]> {
-  const data = await readDb();
-  return data.collections;
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM collections ORDER BY created_at DESC`;
+  return rows.map(mapCollection);
 }
 
 export async function getCollectionById(id: string): Promise<Collection | undefined> {
-  const data = await readDb();
-  return data.collections.find(c => c.id === id);
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM collections WHERE id = ${id}`;
+  return rows.length > 0 ? mapCollection(rows[0]) : undefined;
 }
 
 export async function getCollectionByShareId(shareId: string): Promise<Collection | undefined> {
-  const data = await readDb();
-  return data.collections.find(c => c.shareId === shareId);
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM collections WHERE share_id = ${shareId}`;
+  return rows.length > 0 ? mapCollection(rows[0]) : undefined;
 }
 
 export async function createCollection(name: string, description: string): Promise<Collection> {
-  const data = await readDb();
-  const collection: Collection = {
-    id: uuidv4(),
-    name,
-    description,
-    shareId: uuidv4().slice(0, 8),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  data.collections.push(collection);
-  await writeDb(data);
-  return collection;
+  const sql = getDb();
+  const id = uuidv4();
+  const shareId = uuidv4().slice(0, 8);
+  const now = new Date().toISOString();
+
+  await sql`
+    INSERT INTO collections (id, name, description, share_id, created_at, updated_at)
+    VALUES (${id}, ${name}, ${description}, ${shareId}, ${now}, ${now})
+  `;
+
+  return { id, name, description, shareId, createdAt: now, updatedAt: now };
 }
 
 export async function updateCollection(id: string, name: string, description: string): Promise<Collection | null> {
-  const data = await readDb();
-  const index = data.collections.findIndex(c => c.id === id);
-  if (index === -1) return null;
-  data.collections[index] = {
-    ...data.collections[index],
-    name,
-    description,
-    updatedAt: new Date().toISOString(),
-  };
-  await writeDb(data);
-  return data.collections[index];
+  const sql = getDb();
+  const now = new Date().toISOString();
+
+  const rows = await sql`
+    UPDATE collections SET name = ${name}, description = ${description}, updated_at = ${now}
+    WHERE id = ${id}
+    RETURNING *
+  `;
+
+  return rows.length > 0 ? mapCollection(rows[0]) : null;
 }
 
 export async function deleteCollection(id: string): Promise<boolean> {
-  const data = await readDb();
-  const index = data.collections.findIndex(c => c.id === id);
-  if (index === -1) return false;
-  data.collections.splice(index, 1);
-  // Also delete all songs in this collection
-  data.songs = data.songs.filter(s => s.collectionId !== id);
-  await writeDb(data);
-  return true;
+  const sql = getDb();
+  const result = await sql`DELETE FROM collections WHERE id = ${id}`;
+  return (result as unknown as { count?: number }).count !== 0;
 }
 
 // ============ Songs ============
 
 export async function getSongsByCollection(collectionId: string): Promise<Song[]> {
-  const data = await readDb();
-  const songs = data.songs.filter(s => s.collectionId === collectionId);
-  // Sort by order field
-  return songs.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const sql = getDb();
+  const rows = await sql`
+    SELECT * FROM songs WHERE collection_id = ${collectionId} ORDER BY song_order ASC, created_at ASC
+  `;
+  return rows.map(mapSong);
 }
 
 export async function getSongById(id: string): Promise<Song | undefined> {
-  const data = await readDb();
-  return data.songs.find(s => s.id === id);
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM songs WHERE id = ${id}`;
+  return rows.length > 0 ? mapSong(rows[0]) : undefined;
 }
 
 export async function createSong(
@@ -109,25 +117,22 @@ export async function createSong(
   content: string,
   originalKey: string
 ): Promise<Song> {
-  const data = await readDb();
-  // Get the next order number
-  const existingSongs = data.songs.filter(s => s.collectionId === collectionId);
-  const maxOrder = existingSongs.reduce((max, s) => Math.max(max, s.order ?? 0), 0);
+  const sql = getDb();
+  const id = uuidv4();
+  const now = new Date().toISOString();
 
-  const song: Song = {
-    id: uuidv4(),
-    collectionId,
-    title,
-    artist,
-    content,
-    originalKey,
-    order: maxOrder + 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  data.songs.push(song);
-  await writeDb(data);
-  return song;
+  // Get the next order number
+  const orderRows = await sql`
+    SELECT COALESCE(MAX(song_order), 0) + 1 as next_order FROM songs WHERE collection_id = ${collectionId}
+  `;
+  const order = orderRows[0].next_order as number;
+
+  await sql`
+    INSERT INTO songs (id, collection_id, title, artist, content, original_key, song_order, created_at, updated_at)
+    VALUES (${id}, ${collectionId}, ${title}, ${artist}, ${content}, ${originalKey}, ${order}, ${now}, ${now})
+  `;
+
+  return { id, collectionId, title, artist, content, originalKey, order, createdAt: now, updatedAt: now };
 }
 
 export async function updateSong(
@@ -137,39 +142,57 @@ export async function updateSong(
   content: string,
   originalKey: string
 ): Promise<Song | null> {
-  const data = await readDb();
-  const index = data.songs.findIndex(s => s.id === id);
-  if (index === -1) return null;
-  data.songs[index] = {
-    ...data.songs[index],
-    title,
-    artist,
-    content,
-    originalKey,
-    updatedAt: new Date().toISOString(),
-  };
-  await writeDb(data);
-  return data.songs[index];
+  const sql = getDb();
+  const now = new Date().toISOString();
+
+  const rows = await sql`
+    UPDATE songs SET title = ${title}, artist = ${artist}, content = ${content}, original_key = ${originalKey}, updated_at = ${now}
+    WHERE id = ${id}
+    RETURNING *
+  `;
+
+  return rows.length > 0 ? mapSong(rows[0]) : null;
 }
 
 export async function deleteSong(id: string): Promise<boolean> {
-  const data = await readDb();
-  const index = data.songs.findIndex(s => s.id === id);
-  if (index === -1) return false;
-  data.songs.splice(index, 1);
-  await writeDb(data);
-  return true;
+  const sql = getDb();
+  const result = await sql`DELETE FROM songs WHERE id = ${id}`;
+  return (result as unknown as { count?: number }).count !== 0;
 }
 
 export async function reorderSongs(collectionId: string, songIds: string[]): Promise<boolean> {
-  const data = await readDb();
-  // Update order for each song based on its position in the array
+  const sql = getDb();
   for (let i = 0; i < songIds.length; i++) {
-    const index = data.songs.findIndex(s => s.id === songIds[i] && s.collectionId === collectionId);
-    if (index !== -1) {
-      data.songs[index].order = i + 1;
-    }
+    await sql`
+      UPDATE songs SET song_order = ${i + 1} WHERE id = ${songIds[i]} AND collection_id = ${collectionId}
+    `;
   }
-  await writeDb(data);
   return true;
+}
+
+// ============ Mappers ============
+
+function mapCollection(row: Record<string, unknown>): Collection {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    description: (row.description as string) || '',
+    shareId: row.share_id as string,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
+function mapSong(row: Record<string, unknown>): Song {
+  return {
+    id: row.id as string,
+    collectionId: row.collection_id as string,
+    title: row.title as string,
+    artist: (row.artist as string) || '',
+    content: (row.content as string) || '',
+    originalKey: (row.original_key as string) || 'C',
+    order: (row.song_order as number) || 0,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
 }

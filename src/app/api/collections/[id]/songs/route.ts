@@ -31,13 +31,14 @@ export async function GET(req: NextRequest, ctx: RouteContext<'/api/collections/
     }
 
     const songs = Array.isArray(data.result) ? data.result : [];
-    const mapped = songs.map((song: { id: number; collection_id: number; title: string; artist: string; chord_content: string; original_key: string; song_order: number; tgl_input: string; tgl_update: string }) => ({
+    const mapped = songs.map((song: { id: number; collection_id: number; title: string; artist: string; chord_content: string; original_key: string; reference_link: string; song_order: number; tgl_input: string; tgl_update: string }) => ({
       id: String(song.id),
       collectionId: String(song.collection_id || id),
       title: song.title,
       artist: song.artist || "",
       content: song.chord_content,
       originalKey: song.original_key || "C",
+      referenceLink: song.reference_link || "",
       order: song.song_order || 0,
       createdAt: song.tgl_input || "",
       updatedAt: song.tgl_update || "",
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/collections
   }
 
   const body = await req.json();
-  const { title, artist, content, originalKey } = body;
+  const { title, artist, content, originalKey, referenceLink } = body;
 
   if (!title) {
     return Response.json({ error: "Title is required" }, { status: 400 });
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/collections
         artist: artist || "",
         chord_content: content || "",
         original_key: originalKey || "C",
+        reference_link: referenceLink || "",
       }),
     });
 
@@ -98,6 +100,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/collections
         artist: artist || "",
         content: content || "",
         originalKey: originalKey || "C",
+        referenceLink: referenceLink || "",
         order: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

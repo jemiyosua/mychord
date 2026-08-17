@@ -15,6 +15,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   const [formArtist, setFormArtist] = useState("");
   const [formContent, setFormContent] = useState("");
   const [formKey, setFormKey] = useState("C");
+  const [formReferenceLink, setFormReferenceLink] = useState("");
   const [editingCollection, setEditingCollection] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -58,6 +59,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
           artist: formArtist,
           content: formContent,
           originalKey: formKey,
+          referenceLink: formReferenceLink,
         }),
       });
     } else {
@@ -69,6 +71,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
           artist: formArtist,
           content: formContent,
           originalKey: formKey,
+          referenceLink: formReferenceLink,
         }),
       });
     }
@@ -89,6 +92,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     setFormArtist(song.artist);
     setFormContent(song.content);
     setFormKey(song.originalKey);
+    setFormReferenceLink(song.referenceLink || "");
     setShowForm(true);
   }
 
@@ -99,6 +103,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     setFormArtist("");
     setFormContent("");
     setFormKey("C");
+    setFormReferenceLink("");
   }
 
   async function handleMoveUp(idx: number) {
@@ -350,6 +355,21 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Link Referensi Lagu
+              </label>
+              <input
+                type="url"
+                value={formReferenceLink}
+                onChange={(e) => setFormReferenceLink(e.target.value)}
+                placeholder="https://youtube.com/watch?v=... atau link Spotify"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Link YouTube, Spotify, atau sumber lain sebagai referensi
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

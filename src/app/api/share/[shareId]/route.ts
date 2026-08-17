@@ -32,13 +32,14 @@ export async function GET(_req: NextRequest, ctx: RouteContext<'/api/share/[shar
     };
 
     const songs = Array.isArray(data.songs)
-      ? data.songs.map((song: { id: number; title: string; artist: string; chord_content: string; original_key: string; song_order: number }) => ({
+      ? data.songs.map((song: { id: number; title: string; artist: string; chord_content: string; original_key: string; reference_link: string; song_order: number }) => ({
           id: String(song.id),
           collectionId: collection.id,
           title: song.title || "",
           artist: song.artist || "",
           content: song.chord_content || "",
           originalKey: song.original_key || "C",
+          referenceLink: song.reference_link || "",
           order: song.song_order || 0,
           createdAt: "",
           updatedAt: "",

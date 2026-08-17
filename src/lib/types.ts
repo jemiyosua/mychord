@@ -14,6 +14,7 @@ export interface Song {
   artist: string;
   content: string; // Lyrics with chord notations in brackets like [Am]Hello [C]World
   originalKey: string;
+  referenceLink: string;
   order: number;
   createdAt: string;
   updatedAt: string;

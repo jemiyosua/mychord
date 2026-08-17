@@ -63,6 +63,7 @@ export async function goSaveSong(params: {
   token: string;
   user_id: number;
   song_id?: number;
+  collection_id?: number;
   title?: string;
   artist?: string;
   chord_content?: string;
@@ -77,11 +78,13 @@ export async function goSaveSong(params: {
 export interface SongResult {
   id: number;
   user_id: number;
+  collection_id: number;
   title: string;
   artist: string;
   chord_content: string;
   original_key: string;
   genre: string;
+  song_order: number;
   tgl_input: string;
   tgl_update: string;
 }
@@ -90,6 +93,7 @@ export async function goGetSongs(params: {
   token: string;
   user_id: number;
   song_id?: number;
+  collection_id?: number;
   search?: string;
   page?: number;
   row_page?: number;
